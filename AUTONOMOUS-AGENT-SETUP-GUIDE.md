@@ -259,8 +259,10 @@ If the agent will handle money beyond MOR staking:
   - Allowances reset automatically every 24 hours
 - The agent draws funds within its daily allowance without co-signatures
 - Anything above the allowance -- or any admin change -- requires the human's co-signature
-- The [safe-treasury](https://github.com/betterbrand/safe-treasury) repo has tested scripts for the full workflow: `safe-deploy.mjs`, `safe-configure.mjs`, `safe-propose.mjs`, `safe-refill.mjs`, `safe-status.mjs`
-- After deployment, run `node scripts/safe-status.mjs` to verify configuration and check balances, allowance usage, and pending transactions (read-only, no private key needed)
+- The [safe-agent-treasury](https://github.com/betterbrand/safe-agent-treasury) repo has tested scripts for the full workflow: `agent-treasury-deploy.mjs`, `agent-treasury-configure.mjs`, `agent-treasury-propose.mjs`, `agent-treasury-refill.mjs`, `agent-treasury-status.mjs`
+- All treasury scripts require `SAFE_RPC` in `~/morpheus/.env` — there is no public RPC fallback by design (public RPCs can return manipulated data for financial operations). Use Alchemy, Infura, or QuickNode.
+- The scripts default to keychain entries named `everclaw-agent` / `everclaw-wallet-key`. If your setup uses different names, override with `SAFE_KEYCHAIN_ACCOUNT` and `SAFE_KEYCHAIN_SERVICE` in `~/morpheus/.env`.
+- After deployment, run `node scripts/agent-treasury-status.mjs` to verify configuration and check balances, allowance usage, and pending transactions (read-only, no private key needed)
 - **The Safe IS the guardrail.** On-chain enforcement, not software promises.
 - **Future:** For DeFi operations beyond simple transfers (e.g., swaps, lending), the [Zodiac Roles Modifier v2](https://docs.roles.gnosisguild.org/) provides contract-level permission scoping by address, function selector, and parameter values.
 
@@ -537,6 +539,27 @@ If the agent runs cron jobs or daemons that need secrets (e.g., a wallet key for
 
 See Phase 2b for setup instructions.
 
+### Disk Encryption (FileVault)
+
+FileVault encrypts the entire disk at rest, protecting against physical theft of the Mac mini. However, on a headless machine there's a significant tradeoff: **FileVault requires a password at the pre-boot login screen before the disk unlocks.** If the machine restarts unexpectedly (power outage, kernel panic, macOS update), it will sit at the login screen waiting for input. No disk access, no agent, no recovery — until someone physically types the password or connects via Screen Sharing (which itself requires the OS to be booted).
+
+**Options:**
+
+- **Skip FileVault, use application-level encryption.** Encrypt only sensitive files (message archives, financial logs) with AES-256 using a key stored in the Keychain. The machine recovers from reboots automatically, and critical data is still encrypted at rest. **Recommended for headless always-on machines.**
+- **Enable FileVault and accept the risk.** Better security at rest, but any unexpected reboot requires physical intervention. Use `sudo fdesetup authrestart` for planned restarts (stores a one-time unlock key in firmware, survives exactly one reboot).
+- **MDM Bootstrap Token.** Institutional Macs on MDM can auto-unlock FileVault. Not applicable to personal builds.
+
+### Signal Message Persistence
+
+`signal-cli` does not store inbound messages. It's a relay — once a message is delivered to the listening daemon, it's gone. If the agent session isn't running when a message arrives (between sessions, during restarts, or during compaction), that message is lost permanently.
+
+**Mitigations:**
+
+- **OpenClaw session transcripts:** Enable `memorySearch.experimental.sessionMemory: true` to vector-index conversations that reach the agent. Doesn't capture messages that arrive when the agent is offline.
+- **SSE sidecar logging:** Tap the signal-cli daemon's event stream and write messages to an encrypted log file. Captures everything regardless of agent session state. Not built into signal-cli or OpenClaw — requires a custom script.
+
+This is a known gap in the architecture. Plan for it if message continuity matters to your use case.
+
 ### Hardening Checklist
 
 - [ ] Agent user is Standard (not admin): `dseditgroup -o checkmember -m AGENT admin` returns "no"
@@ -627,7 +650,7 @@ These are real issues encountered during the original build:
 
 **3. macOS Keychain locks in SSH sessions.** Run `security unlock-keychain` before accessing secrets over SSH. This catches everyone the first time.
 
-**4. LaunchAgents don't work on headless Macs.** LaunchAgents require the GUI domain (`gui/UID`), which macOS only creates when a user is logged in at the graphical console. On a headless Mac mini -- even with auto-login enabled and an HDMI dummy dongle -- the GUI session may not exist. `launchctl bootstrap gui/UID` will fail with "Could not find domain for." Use cron instead for scheduled tasks; it works in any session type.
+**4. LaunchAgents may not work on headless Macs.** LaunchAgents require the GUI domain (`gui/UID`), which macOS only creates when a user is logged in at the graphical console. On some headless Mac mini configurations -- even with auto-login enabled and an HDMI dummy dongle -- the GUI session may not exist. `launchctl bootstrap gui/UID` will fail with "Could not find domain for." If this happens, use cron instead for scheduled tasks; it works in any session type. **Note:** if auto-login + HDMI dummy dongle successfully creates a GUI session on your machine, LaunchAgents will work fine. Test with `launchctl list` after a reboot to confirm.
 
 **5. Removing a user from admin kills SSH access.** macOS Remote Login defaults to admin users only. If you remove the agent from admin without first adding it to `com.apple.access_ssh`, SSH connections will be accepted (key auth succeeds) then immediately dropped. This locks you out of a headless machine. Always add to `com.apple.access_ssh` first, test SSH, then remove from admin.
 
@@ -640,6 +663,10 @@ These are real issues encountered during the original build:
 **9. Heredocs don't paste cleanly over SSH.** Multi-line heredocs corrupt when pasted into SSH terminals. Use single-line echo commands or `scp` files directly to the Mac mini.
 
 **10. Public RPC stale nonce after Safe transactions.** Public RPC endpoints (e.g., BlastAPI) serve stale nonce reads immediately after a transaction confirms on-chain. Sequential Safe transactions fail with `GS026` (invalid signature) or `GS013` (tx failed) because the next transaction hash is computed with a stale nonce. Fix: add a 5-second delay between sequential Safe transactions, or use a private RPC with consistent reads.
+
+**11. Treasury scripts require SAFE_RPC — not optional.** The safe-agent-treasury scripts exit with an error if `SAFE_RPC` is not set in `~/morpheus/.env`. There is no public RPC fallback by design (security: public RPCs can return manipulated data for financial operations). Documentation previously listed this as optional. Use Alchemy, Infura, or QuickNode — free tiers are sufficient for read-heavy agent workloads.
+
+**12. Treasury keychain defaults don't match your setup.** The safe-agent-treasury scripts default to keychain entries named `everclaw-agent` / `everclaw-wallet-key` in a dedicated keychain at `~/Library/Keychains/everclaw.keychain-db`. If you stored your wallet key under different names or in the login keychain, you'll get "Could not retrieve wallet key from Keychain" errors. Fix: set `SAFE_KEYCHAIN_ACCOUNT`, `SAFE_KEYCHAIN_SERVICE`, and `SAFE_KEYCHAIN_DB` in `~/morpheus/.env` to match your actual keychain configuration.
 
 ---
 
