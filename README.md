@@ -2,7 +2,7 @@
 
 A complete, tested guide to building an always-on AI agent with its own identity, crypto wallet, and three-tier inference fallback chain -- powered by a Mac mini and the Morpheus decentralized AI network.
 
-Every step in this guide was tested on real hardware with real money. 9 gotchas were hit during the original build and fixes for all of them are documented.
+Every step in this guide was tested on real hardware with real money. 12 gotchas were hit during the build and fixes for all of them are documented.
 
 ---
 
@@ -84,11 +84,14 @@ These are real bugs from the original build, with fixes:
 1. **signal-cli platform mismatch** -- frameworks download the wrong binary on ARM Macs. Install via Homebrew.
 2. **Signal captcha on headless machines** -- solve on your laptop at signalcaptchas.org, copy the token.
 3. **macOS Keychain locks in SSH** -- run `security unlock-keychain` before accessing secrets.
-4. **launchctl bootstrap fails over SSH** -- SSH runs in the background domain. Manual start after SSH, auto on reboot.
+4. **LaunchAgents may not load on headless Macs** -- depends on GUI session. Test after reboot; use cron as fallback.
 5. **Morpheus proxy-router overflow (v5.11.0)** -- reset allowance to 0, let the router manage.
 6. **Morpheus model IDs wrong out of the box** -- verify against the actual network.
 7. **Apple Silicon is fast for local inference** -- M3 Ultra 96GB runs Llama 3.3 70B. Don't underestimate it.
 8. **Heredocs corrupt over SSH** -- use single-line commands or scp files directly.
+9. **Public RPC stale nonce** -- sequential Safe transactions fail on public RPCs. Use a private RPC.
+10. **Treasury scripts require SAFE_RPC** -- not optional despite what docs said. No public fallback by design.
+11. **Treasury keychain defaults won't match your setup** -- override with env vars.
 
 ## Core Principles
 
