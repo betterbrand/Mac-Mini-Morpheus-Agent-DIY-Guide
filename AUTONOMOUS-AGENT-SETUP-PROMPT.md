@@ -142,8 +142,8 @@ Steps:
 - Enable AllowanceModule with daily transfer caps per token (e.g., 50 MOR/day, 0.05 ETH/day)
 - Register the agent as a delegate -- it draws funds within daily allowance without co-signatures
 - Above the allowance or any admin change: needs human co-signature
-- Use the [safe-treasury](https://github.com/betterbrand/safe-treasury) repo -- tested scripts for deploy, configure, propose, auto-refill, and status
-- After deployment: `node scripts/safe-status.mjs` to verify config and monitor allowance usage (read-only, no key needed)
+- Use the [safe-agent-treasury](https://github.com/betterbrand/safe-agent-treasury) repo -- tested scripts for deploy, configure, propose, auto-refill, and status
+- After deployment: `node scripts/agent-treasury-status.mjs` to verify config and monitor allowance usage (read-only, no key needed)
 - The Safe IS the guardrail. On-chain, not software.
 - Future: Zodiac Roles Modifier v2 for DeFi permission scoping (contract address + function selector + parameter constraints)
 

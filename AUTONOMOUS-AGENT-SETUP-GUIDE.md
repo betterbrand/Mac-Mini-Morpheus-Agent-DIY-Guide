@@ -605,7 +605,7 @@ Cron works in any session type:
 
 ```
 # Example: refill hot wallet every 6 hours
-0 */6 * * * cd /Users/agent/safe-treasury && /opt/homebrew/opt/node@22/bin/node scripts/safe-refill.mjs >> /Users/agent/morpheus/data/logs/refill.log 2>&1
+0 */6 * * * cd /Users/agent/safe-agent-treasury && /opt/homebrew/opt/node@22/bin/node scripts/agent-treasury-refill.mjs >> /Users/agent/morpheus/data/logs/refill.log 2>&1
 ```
 
 **Note:** Use absolute paths to `node` in crontab -- cron doesn't load your shell profile, so `node` won't be on the PATH.
