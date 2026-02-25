@@ -93,6 +93,37 @@ These are real bugs from the original build, with fixes:
 10. **Treasury scripts require SAFE_RPC** -- not optional despite what docs said. No public fallback by design.
 11. **Treasury keychain defaults won't match your setup** -- override with env vars.
 
+## Validate Your Setup
+
+After completing the build (or anytime you want a health check), run the validation script to verify your setup matches the guide:
+
+```bash
+# One-time setup: copy the config template and fill in your values
+cp validate-config.example.sh validate-config.sh
+nano validate-config.sh
+
+# Run all checks
+./validate.sh
+
+# Run as admin for SSH/firewall checks, as agent for workspace/keychain checks
+# Checks that need the other user context are automatically skipped
+
+# Other options
+./validate.sh --phase 1      # Run only Phase 1 (Mac mini setup) checks
+./validate.sh --json          # Machine-readable JSON output
+./validate.sh --quiet         # Summary only
+```
+
+The script checks ~72 items across all 7 phases: user accounts, SSH hardening, Proton Bridge, Morpheus services, Ollama, persona files, secret management, and security hardening. Each run writes both a human-readable log and a JSON log to `~/.agent-validate/` -- the JSON log contains everything needed to diagnose issues remotely.
+
+Checks are scored:
+- **95-100 (Excellent):** Setup matches the guide
+- **85-94 (Good):** Minor recommendations not followed
+- **70-84 (Needs attention):** Some requirements not met
+- **Below 70 (Critical):** Significant gaps in setup
+
+Optional components (Signal, Ollama, Safe multi-sig) are skipped entirely when disabled in config, so they don't penalize your score.
+
 ## Core Principles
 
 1. **Identity separation.** The agent is not you. Own email, wallet, accounts. Your credentials never touch its machine.
